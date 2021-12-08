@@ -60,7 +60,12 @@ for i=1:cf_len
     for j=1:fa_len
         correct = 0;
         fa = f_attack(j);
-        Ntr = reshape(Nt(randperm(length(Nt)*2)), length(Nt), 2);
+        %Ntr = reshape(Nt(randperm(length(Nt)*2)), length(Nt), 2);
+        Ntr = zeros(length(Pt), d-1);
+        for k=1:length(Pt)
+            r = randi([1 length(Nt)]);
+            Ntr(k,:) = Nt(r,:);
+        end
         Ptattk = Pt+fa*(Ntr-Pt);
         X_test_attk = [Ptattk;Nt];
         
