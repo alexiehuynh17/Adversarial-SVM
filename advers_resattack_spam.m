@@ -6,6 +6,9 @@ X_train = train_T{:,1:d-1};
 y_train = train_T{:,d};
 n_train = length(y_train);
 
+N = X_train((y_train == -1),:);
+P = X_train((y_train == 1),:);
+
 X_test = test_T{:,1:d-1};
 y_test = test_T{:,d};
 n_test = length(y_test);
@@ -25,7 +28,7 @@ fa_len = length(f_attack);
 output_adsvm = zeros(cd_len, fa_len);
 
 x_mean = mean(N);                        
-x_t = repmat(x_mean,length(N),1);
+x_t = repmat(x_mean,length(P),1);
 ColOfOnes = ones(d-1,1);
 
 for i=1:cd_len
@@ -37,7 +40,7 @@ for i=1:cd_len
     xe = x_t-P;
     xe = [xe;ze];
     
-    cvx_begin quiet                       
+    cvx_begin                      
         variable w(d-1) 
         variable b;
         variable xi(n_train);
@@ -48,9 +51,9 @@ for i=1:cd_len
         minimize 1/2 *(norm(w)) + C*sum(xi);
         subject to
             xi >= 0;
-            xi - 1 + y_test.*(X_train*w+b)- t >= 0;
+            xi - 1 + y_train.*(X_train*w+b)- t >= 0;
             t - (u.*e)*ColOfOnes >= 0;
-            (v - u).*xe - 0.5*repmat((1+y_test),1,d-1).*repmat(w',n_test,1) == 0;
+            (v - u).*xe - 0.5*repmat((1+y_train),1,d-1).*repmat(w',n_train,1) == 0;
             u >= 0;
             v >= 0;       
     cvx_end
