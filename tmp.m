@@ -1,10 +1,39 @@
 train_T = readtable('data/spam_train.csv','ReadVariableNames',false);
 test_T = readtable('data/spam_test.csv','ReadVariableNames',false);
 
+%train_T = readtable('data/train_data.csv','ReadVariableNames',false);
+%test_T = readtable('data/test_data.csv','ReadVariableNames',false);
+
 d = length(train_T.Properties.VariableNames);
 X_train = train_T{:,1:d-1};
 y_train = train_T{:,d};
 n_train = length(y_train);
+
+rows = randperm(n_train, 0.1*n_train); 
+X_build = X_train(rows, :);
+y_build = y_train(rows, 1);
+
+N = X_build((y_build == -1),:);
+P = X_build((y_build == 1),:);
+PN = [P; N];
+PNL = [ones(length(P),1); -1*ones(length(N),1)];
+
+%output_adsvm(1,1) = (correct/(length(Nt) + length(Ptattk)))*100;
+%{
+train_T = readtable('data/spam_train.csv','ReadVariableNames',false);
+test_T = readtable('data/spam_test.csv','ReadVariableNames',false);
+
+%train_T = readtable('data/train_data.csv','ReadVariableNames',false);
+%test_T = readtable('data/test_data.csv','ReadVariableNames',false);
+
+d = length(train_T.Properties.VariableNames);
+train = train_T{:,:};
+X_train = train_T{:,1:d-1};
+y_train = train_T{:,d};
+n_train = length(y_train);
+
+N = X_train((y_train == -1),:);
+P = X_train((y_train == 1),:);
 
 X_test = test_T{:,1:d-1};
 y_test = test_T{:,d};
@@ -14,29 +43,116 @@ Nt = X_test((y_test == -1),:);
 Pt = X_test((y_test == 1),:);
 
 C = 1;
-Cf = [0.1, 0.3, 0.5, 0.7, 0.9];
-cf_len = length(Cf);
+cdf = 1;
+
+Cd = [0.9, 0.7, 0.5, 0.3, 0.1];
+%Cd = [0.9];
+cd_len = length(Cd);
+
 f_attack = [0, 0.3, 0.5, 0.7, 1.0];
+%f_attack = [0.3];
 fa_len = length(f_attack);
 
-output_adsvm = zeros(cf_len, fa_len);
+output_adsvm = zeros(cd_len, fa_len);
+w_result = zeros(cd_len, d-1);
 
-maxx = zeros(1,d-1);
-minn = zeros(1,d-1);
-for k = 1:d-1
-    maxx(1,k) = max(X_train(:,k));
-    minn(1,k) = min(X_train(:,k));
+round = 1;
+
+x_mean = mean(N);                        
+x_t = repmat(x_mean,length(P),1);
+
+ColOfOnes = ones(d-1,1);
+
+for i=1:cd_len
+    cd = Cd(i);  
+    e = cdf*((1- cd*abs(x_t - P)./(abs(x_t)+abs(P))).*((x_t-P).^2));
+    ze = zeros(length(N),d-1);
+    e = [e; ze];
+    xe = x_t-P;
+    xe = [xe;ze];
+    for j=1:fa_len
+        correct = 0;
+        fa = f_attack(j);     
+        cvx_begin                 
+            variable w(d-1) 
+            variable b;
+            variable xi(n_train);
+            variable t(n_train);
+            variable u(n_train,d-1);
+            variable v(n_train,d-1);
+
+            minimize 1/2 *(norm(w)) + C*sum(xi);
+            subject to
+                xi >= 0;
+                xi - 1 + y_train.*(X_train*w+b)- t >= 0;
+                t - (u.*e)*ColOfOnes >= 0;
+                (v - u).*xe - 0.5*repmat((1+y_train),1,d-1).*repmat(w',n_train,1) == 0;
+                u >= 0;
+                v >= 0;       
+        cvx_end
+
+        %Ntr = reshape(Nt(randperm(length(Nt)*2)), length(Nt), 2);
+        Ntr = zeros(length(Pt), d-1);
+        for k=1:length(Pt)
+            ra = randi([1 length(Nt)]);
+            Ntr(k,:) = Nt(ra,:);
+        end
+
+        Ptattk = Pt+fa*(Ntr-Pt);
+        X_test_attk = [Ptattk;Nt];
+
+        ypred = Nt*w+b;
+        correct = correct + sum(ypred<=0);
+
+        ypred = Ptattk*w+b;
+        correct = correct + sum(ypred>0);
+        disp(cd)
+        disp(fa) 
+        output_adsvm(i,j) = (correct/round/n_test)*100;
+    end
+    %w_result(i,:) = w;
 end
 
-X_max = zeros(n_train,d-1);
-X_min = zeros(n_train,d-1);
+train_T = readtable('data/spam_train.csv','ReadVariableNames',false);
+test_T = readtable('data/spam_test.csv','ReadVariableNames',false);
 
-for k = 1:d-1
-    X_max(:, k) = maxx(1,k) - X_train(:,k);
-    X_min(:, k) = minn(1,k) - X_train(:,k);
-end
+d = length(train_T.Properties.VariableNames);
+X_train = train_T{:,1:d-1};
+y_train = train_T{:,d};
+n_train = length(y_train);
 
-%{
+%N = X_train((y_train == -1),:);
+%P = X_train((y_train == 1),:);
+
+X_test = test_T{:,1:d-1};
+y_test = test_T{:,d};
+n_test = length(y_test);
+
+Nt = X_test((y_test == -1),:);
+Pt = X_test((y_test == 1),:);
+
+rows = randperm(n_train, 0.1*n_train); 
+X_train = X_train(rows, :);
+y_train = y_train(rows, 1);
+n_train = length(rows);
+
+N = X_train((y_train == -1),:);
+P = X_train((y_train == 1),:);
+
+cdf = 1;
+cd = 0.9;
+
+x_mean = mean(N);                        
+x_t = repmat(x_mean,length(P),1);
+e = cdf*((1- cd*abs(x_t - P)./(abs(x_t)+abs(P))).*((x_t-P).^2));
+ze = zeros(length(N),d-1);
+e = [e; ze];
+xe = x_t-P;
+xe = [xe;ze];
+
+col = ones(1,d-1);
+tmpp = dot(sum(isnan(e)),col);
+
 A = [-1, -2]; B = [1, 2];  
 Sigma = [1 .5; 0.5 2]; R = chol(Sigma);
 m = 100; 
@@ -226,6 +342,86 @@ for i=1:cf_len
                 correct = correct + 1;
             end
         end
+        output_adsvm(i,j) = (correct/n_test)*100;
+    end
+end
+
+train_T = readtable('data/spam_train.csv','ReadVariableNames',false);
+test_T = readtable('data/spam_test.csv','ReadVariableNames',false);
+
+d = length(train_T.Properties.VariableNames);
+X_train = train_T{:,1:d-1};
+y_train = train_T{:,d};
+n_train = length(y_train);
+
+X_test = test_T{:,1:d-1};
+y_test = test_T{:,d};
+n_test = length(y_test);
+
+Nt = X_test((y_test == -1),:);
+Pt = X_test((y_test == 1),:);
+
+C = 1;
+Cf = [0.1, 0.3, 0.5, 0.7, 0.9];
+cf_len = length(Cf);
+f_attack = [0, 0.3, 0.5, 0.7, 1.0];
+fa_len = length(f_attack);
+
+output_adsvm = zeros(cf_len, fa_len);
+
+maxx = zeros(1,d-1);
+minn = zeros(1,d-1);
+for k = 1:d-1
+    maxx(1,k) = max(X_train(:,k));
+    minn(1,k) = min(X_train(:,k));
+end
+
+X_max = zeros(n_train,d-1);
+X_min = zeros(n_train,d-1);
+
+for k = 1:d-1
+    X_max(:, k) = maxx(1,k) - X_train(:,k);
+    X_min(:, k) = minn(1,k) - X_train(:,k);
+end
+
+ColOfOnes = ones(d-1,1);
+
+for i=1:cf_len
+    cf = Cf(i);
+    cvx_begin                      
+        variable w(d-1) 
+        variable b;
+        variable xi(n_train);
+        variable t(n_train);
+        variable u(n_train,d-1);
+        variable v(n_train,d-1);
+
+        minimize 1/2 *(norm(w)) + C*sum(xi);
+        subject to
+            xi >= 0;
+            xi - 1 + y_train.*(X_train*w+b)- t >= 0;
+            t >= cf*(((v.*X_max) - (u.*X_min))*ColOfOnes);
+            u-v == 0.5*repmat((1+y_train),1,d-1).*repmat(w',n_train,1);
+            u >= 0;
+            v >= 0;    
+    cvx_end
+    for j=1:fa_len
+        correct = 0;
+        fa = f_attack(j);
+        %Ntr = reshape(Nt(randperm(length(Nt)*2)), length(Nt), 2);
+        Ntr = zeros(length(Pt), d-1);
+        for k=1:length(Pt)
+            r = randi([1 length(Nt)]);
+            Ntr(k,:) = Nt(r,:);
+        end
+        Ptattk = Pt+fa*(Ntr-Pt);
+        X_test_attk = [Ptattk;Nt];
+        
+        ypred = Nt*w+b;
+        correct = correct+sum(ypred<=0);
+        
+        ypred = Ptattk*w+b;
+        correct = correct + sum(ypred>0);
         output_adsvm(i,j) = (correct/n_test)*100;
     end
 end

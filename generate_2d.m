@@ -26,7 +26,7 @@ y_test(rowp+1:rowp+rown) = -1;
 Xy_test = [X_test, y_test];
 
 T_train = array2table(Xy_train);
-T_test = array2table(Xy_train);
+T_test = array2table(Xy_test);
 T_train.Properties.VariableNames(1:3) = {'x1','x2','label'};
 T_test.Properties.VariableNames(1:3) = {'x1','x2','label'};
 writetable(T_train,'data/train_data.csv')

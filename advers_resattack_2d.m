@@ -24,6 +24,8 @@ f_attack = [0, 0.3, 0.5, 0.7, 1.0];
 fa_len = length(f_attack);
 
 output_adsvm = zeros(cd_len, fa_len);
+output_wtrain = zeros(cd_len, d);
+output_btrain = zeros(cd_len, 1);
 
 x_mean = mean(N);                        
 x_t = repmat(x_mean,length(P),1);
@@ -38,7 +40,7 @@ for i=1:cd_len
     xe = x_t-P;
     xe = [xe;ze];
     
-    cvx_begin quiet                       
+    cvx_begin quiet                        
         variable w(d) 
         variable b;
         variable xi(n_train);
@@ -55,6 +57,8 @@ for i=1:cd_len
             u >= 0;
             v >= 0;       
     cvx_end
+    output_wtrain(i,:) = w;
+    output_btrain(i,1) = b;
     
     for j=1:fa_len
         correct = 0;
@@ -70,4 +74,17 @@ for i=1:cd_len
         correct = correct + sum(ypred>0);
         output_adsvm(i,j) = (correct/n_test)*100;
     end
+    fprintf('cd = %f done\n', cd);  
 end
+
+T_output = array2table(output_adsvm);
+T_output.Properties.VariableNames(1:5) = {'fa=0','fa=0.3','fa=0.5','fa=0.7','fa=1'};
+writetable(T_output,'result/2D/restrained/output_accuracy.csv')
+
+T_wtrain = array2table(output_wtrain);
+T_wtrain.Properties.VariableNames(1:2) = {'w1', 'w2'};
+writetable(T_wtrain,'result/2D/restrained/w_train.csv')
+
+T_btrain = array2table(output_btrain);
+T_btrain.Properties.VariableNames(1) = {'b'};
+writetable(T_btrain,'result/2D/restrained/b_train.csv')

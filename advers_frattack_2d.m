@@ -20,6 +20,8 @@ f_attack = [0, 0.3, 0.5, 0.7, 1.0];
 fa_len = length(f_attack);
 
 output_adsvm = zeros(cf_len, fa_len);
+output_wtrain = zeros(cf_len, d);
+output_btrain = zeros(cf_len, 1);
 
 maxx = zeros(1,d);
 minn = zeros(1,d);
@@ -57,6 +59,9 @@ for i=1:cf_len
             u >= 0;
             v >= 0;    
     cvx_end
+    output_wtrain(i,:) = w;
+    output_btrain(i,1) = b;
+    
     for j=1:fa_len
         correct = 0;
         fa = f_attack(j);
@@ -69,6 +74,7 @@ for i=1:cf_len
         
         ypred = Ptattk*w+b;
         correct = correct + sum(ypred>0);
-        output_adsvm(i,j) = (correct/n_test)*100;
+        output_adsvm(i,j) = (correct/length(X_test_attk))*100;
     end
+    fprintf('cf = %f done\n', cf);  
 end
